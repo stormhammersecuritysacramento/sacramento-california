@@ -1,0 +1,57 @@
+name: Deploy Clean Sacramento Campaign
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Clean Workspace
+        run: |
+          rm -rf *.html *.xml
+          echo "Workspace cleared."
+
+      - name: Run Sacramento Script
+        run: node generate-sac.js
+
+      - name: Force Commit and Push Clean Assets
+        run: |
+          git config --global user.name "Automated Generator"
+          git config --global user.email "bot@github.com"
+          git add *.html *.xml
+          git commit -m "Compile pure text landing pages and XML sitemap index" || echo "No changes to commit"
+          git push origin main --force || echo "No changes to push"
+
+      - name: Upload Clean Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
